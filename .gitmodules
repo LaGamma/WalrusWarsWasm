@@ -1,0 +1,3 @@
+[submodule "libs/gammaraylib"]
+	path = libs/gammaraylib
+	url = git@github.com:LaGamma/gammaraylib.git
