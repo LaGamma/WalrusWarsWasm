@@ -1,6 +1,6 @@
 # Walrus Wars!
 
-[![Play in Browser](https://shields.io)](https://lagamma.github.io/WalrusWarsWasm/)
+[![Play in Browser](https://img.shields.io/badge/%E2%96%B6_Play_in_Browser-WalrusWars-AA00FF?style=for-the-badge&logo=webassembly&logoColor=white)](https://lagamma.github.io/WalrusWarsWasm/)
 
 A fast-paced arctic arena brawler ported to **Mojo** on top of [gammaraylib](https://github.com/LaGamma/gammaraylib), targeting both **Native Linux** (GLFW + OpenGL 4.6) and **WebAssembly** (Emscripten + WebGL 2 + WebAudio).
 
