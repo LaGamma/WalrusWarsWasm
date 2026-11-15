@@ -77,7 +77,7 @@ struct CameraView(Copyable, Movable):
     var splash_timer: Float32
     var debug_mode: Bool
 
-    #var water_shader: WaterShader
+    var water_shader: WaterShader
 
     var rng: GameRng
 
@@ -132,7 +132,7 @@ struct CameraView(Copyable, Movable):
         self.round_counter_20_anim.init(self.round_counter_20, 3, 1, 0.3)
         self.walrus_splash_anim.init(self.walrus_splash, 3, 1, 0.3)
         self.water_animation.init(self.water, 3, 1, 0.9)
-        #self.water_shader = WaterShader(rl.gl)
+        self.water_shader = WaterShader(rl.gl)
 
         self.fish_animation_list = List[Animation]()
         for _ in range(MAX_NUM_OF_FISH):
@@ -577,19 +577,19 @@ struct CameraView(Copyable, Movable):
                 shake_y = Float32(self.rng.next_int(-amp // 2, amp // 2))
 
         # Draw procedural arctic caustic water background
-        #var glfwGetTime = rl.glfw.get_function[c_double]("glfwGetTime")
-        #var t = Float32(glfwGetTime())
-        #self.water_shader.draw(rl.rl, rl.gl, -25.0 + shake_x, -25.0 + shake_y,
-        #                       WINDOW_WIDTH + 50.0, WINDOW_HEIGHT + 50.0,
-        #                       t, shake_x, shake_y)
+        var glfwGetTime = rl.glfw.get_function[c_double]("glfwGetTime")
+        var t = Float32(glfwGetTime())
+        self.water_shader.draw(rl.rl, rl.gl, -25.0 + shake_x, -25.0 + shake_y,
+                               WINDOW_WIDTH + 50.0, WINDOW_HEIGHT + 50.0,
+                               t, shake_x, shake_y)
 
         # Draw water background
-        Self._draw_tex_rect(
-            rl,
-            self.water,
-            self.water_animation.uv_rect,
-            Rectangle(-25.0 + shake_x, -25.0 + shake_y, WINDOW_WIDTH + 50.0, WINDOW_HEIGHT + 50.0),
-        )
+        #Self._draw_tex_rect(
+        #    rl,
+        #    self.water,
+        #    self.water_animation.uv_rect,
+        #    Rectangle(-25.0 + shake_x, -25.0 + shake_y, WINDOW_WIDTH + 50.0, WINDOW_HEIGHT + 50.0),
+        #)
 
         # Draw ice blocks
         var white = Vec4f(1.0, 1.0, 1.0, 1.0)
