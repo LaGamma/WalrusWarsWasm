@@ -24,8 +24,7 @@ struct WaterShader(TrivialRegisterPassable):
     var shake_loc: c_int
 
     def __init__(out self, gl: OwnedDLHandle) raises:
-        #var header: String = "#version 300 es\nprecision highp float;\n" if is_defined["WASM"]() else "#version 460 core\n"
-        var header: String = "#version 300 es\nprecision mediump float;\n" if is_defined["WASM"]() else "#version 460 core\n"
+        var header: String = "#version 300 es\nprecision highp float;\n" if is_defined["WASM"]() else "#version 460 core\n"
 
         var vs_src: String = header + """layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec4 aColor;
