@@ -24,7 +24,8 @@ struct WaterShader(TrivialRegisterPassable):
     var shake_loc: c_int
 
     def __init__(out self, gl: OwnedDLHandle) raises:
-        var header: String = "#version 300 es\nprecision highp float;\n" if is_defined["WASM"]() else "#version 460 core\n"
+        #var header: String = "#version 300 es\nprecision highp float;\n" if is_defined["WASM"]() else "#version 460 core\n"
+        var header: String = "#version 300 es\nprecision mediump float;\n" if is_defined["WASM"]() else "#version 460 core\n"
 
         var vs_src: String = header + """layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec4 aColor;
@@ -66,24 +67,15 @@ float noise(vec2 p) {
 float randomSparkles(vec2 p, float t) {
     vec2 cell = floor(p);
     vec2 local = fract(p);
-    float hit = 0.0;
-    for (int j = -1; j <= 1; j++) {
-        for (int i = -1; i <= 1; i++) {
-            vec2 g = vec2(float(i), float(j));
-            vec2 rnd = hash2(cell + g);
-            if (rnd.x > 0.65) {
-                vec2 pos = g + 0.15 + 0.70 * rnd;
-                pos.y += sin(t * 1.6 + rnd.y * 6.2831) * 0.12;
-                vec2 d = local - pos;
-                d.x *= 0.65;
-                float dist = length(d);
-                float pulse = sin(t * (2.2 + rnd.x * 2.5) + rnd.y * 12.0) * 0.5 + 0.5;
-                float radius = mix(0.03, 0.11, pulse);
-                hit = max(hit, step(dist, radius) * step(0.45, pulse));
-            }
-        }
-    }
-    return hit;
+    vec2 rnd = hash2(cell);
+    if (rnd.x <= 0.65) return 0.0;
+    vec2 pos = 0.15 + 0.70 * rnd;
+    pos.y += sin(t * 1.6 + rnd.y * 6.2831) * 0.12;
+    vec2 d = local - pos;
+    d.x *= 0.65;
+    float pulse = sin(t * (2.2 + rnd.x * 2.5) + rnd.y * 12.0) * 0.5 + 0.5;
+    float radius = mix(0.03, 0.11, pulse);
+    return step(dot(d, d), radius * radius) * step(0.45, pulse);
 }
 
 void main() {
@@ -228,3 +220,16 @@ void main() {
 
         glUseProgram(rl.shader_program)
 
+#float randomSparkles(vec2 p, float t) {
+    #vec2 cell = floor(p);
+    #vec2 local = fract(p);
+    #vec2 rnd = hash2(cell);
+    #if (rnd.x <= 0.65) return 0.0;
+    #vec2 pos = 0.15 + 0.70 * rnd;
+    #pos.y += sin(t * 1.6 + rnd.y * 6.2831) * 0.12;
+    #vec2 d = local - pos;
+    #d.x *= 0.65;
+    #float pulse = sin(t * (2.2 + rnd.x * 2.5) + rnd.y * 12.0) * 0.5 + 0.5;
+    #float radius = mix(0.03, 0.11, pulse);
+    #return step(dot(d, d), radius * radius) * step(0.45, pulse);
+#}
