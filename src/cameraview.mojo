@@ -606,6 +606,7 @@ struct CameraView(Copyable, Movable):
                     ##rl.draw_rectangle(bx, by, bw, bh, ice_col)
                     ##rl.draw_rectangle_lines(bx, by, bw, bh, white)
         # Draw ice blocks with organic neighbor-aware shorelines, 3D depth rims, and surface sheen
+        # Pass 1: Draw all ice block rectangles, 3D depth lips, and shoreline rims (100% GL_TRIANGLES batch)
         var prog = logic.get_stage_progression()
         for i in range(ICE_BLOCKS_WIDTH + 2):
             for j in range(ICE_BLOCKS_HEIGHT + 2):
@@ -617,7 +618,6 @@ struct CameraView(Copyable, Movable):
                     var by = Float32(j) * ICE_BLOCKS_SIZE_Y + ((ICE_BLOCKS_SIZE_Y - bh) / 2.0) + shake_y
                     var alpha = (230.0 * dura) / 255.0
 
-                    # Subtle deterministic per-tile frost variation so the floe looks less uniform
                     var shade = Float32((i * 7 + j * 13) % 5) * 0.035
                     var ice_col = Vec4f(
                         min((50.0 / 255.0) + shade, 1.0),
@@ -626,13 +626,11 @@ struct CameraView(Copyable, Movable):
                         alpha,
                     )
 
-                    # Check exposed water edges (only full/healthy neighbors merge seamlessly)
                     var has_top   = (j > 0) and (logic.stage.get_tile_dura(i, j - 1, prog) > 0.85)
                     var has_bot   = (j < ICE_BLOCKS_HEIGHT + 1) and (logic.stage.get_tile_dura(i, j + 1, prog) > 0.85)
                     var has_left  = (i > 0) and (logic.stage.get_tile_dura(i - 1, j, prog) > 0.85)
                     var has_right = (i < ICE_BLOCKS_WIDTH + 1) and (logic.stage.get_tile_dura(i + 1, j, prog) > 0.85)
 
-                    # 3D submerged ice thickness lip on exposed bottom/side water edges
                     var lip_col = Vec4f(15.0 / 255.0, 145.0 / 255.0, 195.0 / 255.0, alpha * 0.9)
                     if not has_bot:
                         rl.draw_rectangle(bx, by + bh, bw, 6.0 * dura, lip_col)
@@ -641,10 +639,8 @@ struct CameraView(Copyable, Movable):
                     if not has_right:
                         rl.draw_rectangle(bx + bw, by + 2.0, 2.0 * dura, bh, lip_col)
 
-                    # Main ice surface
                     rl.draw_rectangle(bx, by, bw, bh, ice_col)
 
-                    # Crisp snow-white rim only along exposed outer shorelines
                     var rim_col = Vec4f(1.0, 1.0, 1.0, alpha)
                     var rim_t: Float32 = 2.5 * dura
                     if not has_top:
@@ -656,7 +652,16 @@ struct CameraView(Copyable, Movable):
                     if not has_right:
                         rl.draw_rectangle(bx + bw - rim_t, by, rim_t, bh, rim_col)
 
-                    # Diagonal glossy highlight on healthy ice, or fracture line on melting ice
+        # Pass 2: Draw all glossy sheens and fracture cracks (100% GL_LINES batch)
+        for i in range(ICE_BLOCKS_WIDTH + 2):
+            for j in range(ICE_BLOCKS_HEIGHT + 2):
+                var dura = logic.stage.get_tile_dura(i, j, prog)
+                if dura > 0.0:
+                    var bw = ICE_BLOCKS_SIZE_X * dura
+                    var bh = ICE_BLOCKS_SIZE_Y * dura
+                    var bx = Float32(i) * ICE_BLOCKS_SIZE_X + ((ICE_BLOCKS_SIZE_X - bw) / 2.0) + shake_x
+                    var by = Float32(j) * ICE_BLOCKS_SIZE_Y + ((ICE_BLOCKS_SIZE_Y - bh) / 2.0) + shake_y
+
                     if dura > 0.72 and ((i + j) % 3 == 0):
                         var sheen = Vec4f(1.0, 1.0, 1.0, 0.28 * dura)
                         rl.draw_line(bx + bw * 0.22, by + bh * 0.65, bx + bw * 0.55, by + bh * 0.25, sheen)
@@ -665,6 +670,7 @@ struct CameraView(Copyable, Movable):
                         var crack = Vec4f(10.0 / 255.0, 110.0 / 255.0, 155.0 / 255.0, 0.55)
                         rl.draw_line(bx + bw * 0.20, by + bh * 0.25, bx + bw * 0.55, by + bh * 0.55, crack)
                         rl.draw_line(bx + bw * 0.55, by + bh * 0.55, bx + bw * 0.78, by + bh * 0.35, crack)
+
 
 
         # Draw splash
