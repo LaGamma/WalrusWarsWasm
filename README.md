@@ -15,7 +15,7 @@ A fast-paced arctic arena brawler ported to **Mojo** on top of [gammaraylib](htt
 
 1. **Clone with submodules:**
    ```bash
-   git clone --recurse-submodules https://github.com<username>/WalrusWarsWasm.git
+   git clone --recurse-submodules https://github.com/LaGamma/WalrusWarsWasm.git
    cd WalrusWarsWasm
    ```
 
