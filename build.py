@@ -21,4 +21,7 @@ else:
         *extra_args,
     ]
 
-subprocess.run(cmd, cwd=ROOT, check=True)
+try:
+    subprocess.run(cmd, cwd=ROOT, check=True)
+except KeyboardInterrupt:
+    sys.exit(0)
