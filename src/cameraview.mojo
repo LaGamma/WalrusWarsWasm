@@ -821,10 +821,10 @@ struct CameraView(Copyable, Movable):
             self._text(rl, String(rnd), rc_x + 55.0, 120.0, 42.0, white)
         elif rnd < 20:
             Self._draw_tex_rect(rl, self.round_counter_10, self.round_counter_10_anim.uv_rect, Rectangle(rc_x, 72.0, 120.0, 120.0))
-            self._text(rl, String(rnd), rc_x + 55.0, 120.0, 42.0, white)
+            self._text(rl, String(rnd), rc_x + 43.0, 120.0, 42.0, white)
         else:
             Self._draw_tex_rect(rl, self.round_counter_20, self.round_counter_20_anim.uv_rect, Rectangle(rc_x, 72.0, 120.0, 120.0))
-            self._text(rl, String(rnd), rc_x + 55.0, 120.0, 42.0, white)
+            self._text(rl, String(rnd), rc_x + 43.0, 120.0, 42.0, white)
 
         self._text(rl, "Round", rc_x + 35.0, 108.0, 24.0, white)
 
