@@ -10,7 +10,7 @@ from playercontroller import PlayerController
 from soundmanager import MusicTrack, SFX, SoundManager
 from watershader import WaterShader
 from rng import GameRng
-
+from netclient import NetClient
 
 comptime COLOR_1 = Vec4f(1.0, 1.0, 1.0, 1.0)
 comptime COLOR_2 = Vec4f(155.0 / 255.0, 155.0 / 255.0, 155.0 / 255.0, 1.0)
@@ -20,7 +20,7 @@ comptime COLOR_5 = Vec4f(155.0 / 255.0, 155.0 / 255.0, 1.0, 1.0)
 
 comptime UI_FONT_SCALE: Float32 = 1.38
 
-struct CameraView(Copyable, Movable):
+struct CameraView(Movable):
     var main_menu_selection: String
     var options_menu_selection: String
     var game_over_menu_selection: String
@@ -70,6 +70,7 @@ struct CameraView(Copyable, Movable):
     # Player names
     var walrus1_name_str: String
     var walrus2_name_str: String
+    var last_edited_slot: Int
 
     # Screen shake & timers
     var screenshake_magnitude: Float32
@@ -80,6 +81,9 @@ struct CameraView(Copyable, Movable):
     var water_shader: WaterShader
 
     var rng: GameRng
+
+    var net: NetClient
+    var server_url: String
 
     def __init__(out self, mut rl: Raylib) raises:
         self.main_menu_selection = "P"
@@ -142,6 +146,7 @@ struct CameraView(Copyable, Movable):
 
         self.walrus1_name_str = String(DEFAULT_NAME_1)
         self.walrus2_name_str = String(DEFAULT_NAME_2)
+        self.last_edited_slot = 1
 
         self.screenshake_magnitude = 0.0
         self.screenshake_timer = 0.0
@@ -151,6 +156,9 @@ struct CameraView(Copyable, Movable):
         self.sound_manager.play_music(rl, MusicTrack.TITLE)
 
         self.rng = GameRng(12345)
+
+        self.net = NetClient()
+        self.server_url = "ws://127.0.0.1:8765"
 
     @staticmethod
     def _load_tex(mut rl: Raylib, path: String) raises -> Texture2D:
@@ -483,6 +491,11 @@ struct CameraView(Copyable, Movable):
             Self._draw_tex_rect(rl, self.player1_select, port_src, Rectangle(p1_fx, p1_fy, frame_w, frame_h))
         if self.player2_or_bot == 1:
             Self._draw_tex_rect(rl, self.player2_select, port_src, Rectangle(p2_fx, p2_fy, frame_w, frame_h))
+
+        var net_label = "ONLINE (" + self.net.status_text + ") [N: Disconnect]" if self.net.enabled else "LOCAL MODE [N: Join Online Lobby]"
+        var net_col = Vec4f(0.25, 1.0, 0.55, 1.0) if self.net.enabled else Vec4f(0.75, 0.88, 1.0, 1.0)
+        self._text(rl, net_label, 40.0, WINDOW_HEIGHT - 45.0, 32.0, net_col)
+
         if self.player1_menu_selection == "1":
             Self._draw_tex_rect(rl, self.player_neutral_select, port_src, Rectangle(p1_fx, p1_fy, frame_w, frame_h), cyan)
         elif self.player1_menu_selection == "2":
@@ -1007,12 +1020,14 @@ struct CameraView(Copyable, Movable):
                 self.player1_menu_selection = "P"
                 logic.return_to_menu()
             elif self.player1_menu_selection == "1":
+                self.last_edited_slot = 1
                 self.player1_or_bot = -self.player1_or_bot
                 if self.player1_or_bot == 1:
                     self.entering_name_text = True
                     logic.handle_name_text_submenu()
                     self.walrus1_name_str = ""
             elif self.player1_menu_selection == "2":
+                self.last_edited_slot = 2
                 self.player2_or_bot = -self.player2_or_bot
                 if self.player2_or_bot == 1:
                     self.entering_name_text = True
@@ -1062,6 +1077,37 @@ struct CameraView(Copyable, Movable):
             if self.screenshake_timer < 0.0:
                 self.screenshake_timer = 0.0
 
+        var was_started = self.net.match_started
+        var prev_state = logic.get_state()
+        self.net.poll(logic)
+        if self.net.has_peer_profile:
+            self.net.has_peer_profile = False
+            if self.net.local_player_num == 1:
+                if self.net.local_name.byte_length() > 0:
+                    self.walrus1_name_str = self.net.local_name
+                    logic.walrus1.set_name(self.net.local_name)
+                logic.walrus1.set_color(self.net.local_color)
+                if self.net.peer_name.byte_length() > 0:
+                    self.walrus2_name_str = self.net.peer_name
+                    logic.walrus2.set_name(self.net.peer_name)
+                logic.walrus2.set_color(self.net.peer_color)
+            elif self.net.local_player_num == 2:
+                if self.net.peer_name.byte_length() > 0:
+                    self.walrus1_name_str = self.net.peer_name
+                    logic.walrus1.set_name(self.net.peer_name)
+                logic.walrus1.set_color(self.net.peer_color)
+                if self.net.local_name.byte_length() > 0:
+                    self.walrus2_name_str = self.net.local_name
+                    logic.walrus2.set_name(self.net.local_name)
+                logic.walrus2.set_color(self.net.local_color)
+
+        if (self.net.match_started and not was_started) or (
+            self.net.match_started and prev_state != GameStateEnum.PLAYING and logic.get_state() == GameStateEnum.PLAYING
+        ):
+            self.player1_or_bot = 1
+            self.player2_or_bot = 1
+            self.sound_manager.play_music(rl, MusicTrack.BATTLE)
+
         var state = logic.get_state()
         if state == GameStateEnum.PLAYING:
             for i in range(len(self.fish_animation_list)):
@@ -1070,23 +1116,55 @@ struct CameraView(Copyable, Movable):
             var prog = logic.get_stage_progression()
             var paused = False
 
-            if not logic.walrus1.is_dead():
+            if self.net.match_started and self.net.local_player_num == 2:
+                # Online Guest (Player 2): animate both walruses and send local inputs to Host
                 self.walrus1_animation.update_walrus(logic.walrus1.get_facing_dir(), logic.walrus1.get_state(), d_sec)
-                if self.player1_or_bot == 1:
-                    paused = paused or self.player_controller.update(rl, logic.walrus1, d_sec, 1)
-                else:
-                    paused = paused or self.bot1_controller.update(
-                        rl, logic.walrus1, logic.walrus2, logic.stage, prog, logic.fish_list, d_sec, 1, False
-                    )
-
-            if not logic.walrus2.is_dead():
                 self.walrus2_animation.update_walrus(logic.walrus2.get_facing_dir(), logic.walrus2.get_state(), d_sec)
-                if self.player2_or_bot == 1:
-                    paused = paused or self.player_controller.update(rl, logic.walrus2, d_sec, 2)
-                else:
-                    paused = paused or self.bot2_controller.update(
-                        rl, logic.walrus2, logic.walrus1, logic.stage, prog, logic.fish_list, d_sec, 2, False
-                    )
+
+                var g_dx: Float32 = 0.0
+                var g_dy: Float32 = 0.0
+                if rl.is_key_down(KEY_W) or rl.is_key_down(KEY_UP):
+                    g_dy -= 1.0
+                if rl.is_key_down(KEY_S) or rl.is_key_down(KEY_DOWN):
+                    g_dy += 1.0
+                if rl.is_key_down(KEY_A) or rl.is_key_down(KEY_LEFT):
+                    g_dx -= 1.0
+                if rl.is_key_down(KEY_D) or rl.is_key_down(KEY_RIGHT):
+                    g_dx += 1.0
+                var g_slash = rl.is_key_down(KEY_LEFT_SHIFT) or rl.is_key_down(KEY_RIGHT_SHIFT)
+                self.net.send_guest_input(g_dx, g_dy, g_slash, d_sec)
+
+            elif self.net.match_started and self.net.local_player_num == 1:
+                # Online Host (Player 1): control Walrus 1 locally, apply Guest inputs to Walrus 2, broadcast snapshot
+                if not logic.walrus1.is_dead():
+                    self.walrus1_animation.update_walrus(logic.walrus1.get_facing_dir(), logic.walrus1.get_state(), d_sec)
+                    paused = paused or self.player_controller.update(rl, logic.walrus1, d_sec, 1)
+
+                if not logic.walrus2.is_dead():
+                    self.walrus2_animation.update_walrus(logic.walrus2.get_facing_dir(), logic.walrus2.get_state(), d_sec)
+                    if self.net.remote_p2_slash and logic.walrus2.get_stamina() >= 30.0:
+                        logic.walrus2.raise_tusks(d_sec)
+                    var p2_dir = Vec2f(self.net.remote_p2_dx, self.net.remote_p2_dy)
+                    logic.walrus2.apply_active_force(p2_dir, d_sec)
+            else:
+                # Local 1P / 2P / Bot match
+                if not logic.walrus1.is_dead():
+                    self.walrus1_animation.update_walrus(logic.walrus1.get_facing_dir(), logic.walrus1.get_state(), d_sec)
+                    if self.player1_or_bot == 1:
+                        paused = paused or self.player_controller.update(rl, logic.walrus1, d_sec, 1)
+                    else:
+                        paused = paused or self.bot1_controller.update(
+                            rl, logic.walrus1, logic.walrus2, logic.stage, prog, logic.fish_list, d_sec, 1, False
+                        )
+
+                if not logic.walrus2.is_dead():
+                    self.walrus2_animation.update_walrus(logic.walrus2.get_facing_dir(), logic.walrus2.get_state(), d_sec)
+                    if self.player2_or_bot == 1:
+                        paused = paused or self.player_controller.update(rl, logic.walrus2, d_sec, 2)
+                    else:
+                        paused = paused or self.bot2_controller.update(
+                            rl, logic.walrus2, logic.walrus1, logic.stage, prog, logic.fish_list, d_sec, 2, False
+                        )
 
             if paused:
                 logic.toggle_pause()
@@ -1100,24 +1178,43 @@ struct CameraView(Copyable, Movable):
                 if self.splash_timer < 0.0:
                     self.splash_timer = 0.0
         else:
-            if rl.is_key_pressed(KEY_UP):
-                self.menu_up(rl, logic)
-            elif rl.is_key_pressed(KEY_DOWN):
-                self.menu_down(rl, logic)
-            elif rl.is_key_pressed(KEY_RIGHT):
-                self.menu_right(rl, logic)
-            elif rl.is_key_pressed(KEY_LEFT):
-                self.menu_left(rl, logic)
-            elif rl.is_key_pressed(KEY_ENTER):
-                self.menu_select(rl, logic)
-            elif rl.is_key_pressed(KEY_P):
-                logic.toggle_pause()
-                self.sound_manager.play_sound(rl, SFX.MENU_SELECT, logic.get_sfx_volume())
-            elif rl.is_key_pressed(KEY_GRAVE):
-                self.debug_mode = not self.debug_mode
+            if not self.entering_name_text:
+                if state == GameStateEnum.PLAYER_SELECT_MENU:
+                    if rl.is_key_pressed(KEY_N) or rl.is_key_pressed(345):
+                        if self.net.enabled:
+                            self.net.disconnect()
+                        else:
+                            if self.last_edited_slot == 2:
+                                self.net.local_name = self.walrus2_name_str
+                                self.net.local_color = logic.walrus2.get_color()
+                            else:
+                                self.net.local_name = self.walrus1_name_str
+                                self.net.local_color = logic.walrus1.get_color()
+                            _ = self.net.connect(self.server_url, "lobby")
+                        self.sound_manager.play_sound(rl, SFX.MENU_SELECT, logic.get_sfx_volume())
 
-            if self.entering_name_text:
-                if rl.is_key_pressed(KEY_BACKSPACE):
+                var can_control_menu = (not self.net.match_started) or (self.net.local_player_num == 1)
+                if can_control_menu:
+                    if rl.is_key_pressed(KEY_UP) or rl.is_key_pressed(KEY_W):
+                        self.menu_up(rl, logic)
+                    elif rl.is_key_pressed(KEY_DOWN) or rl.is_key_pressed(KEY_S):
+                        self.menu_down(rl, logic)
+                    elif rl.is_key_pressed(KEY_RIGHT) or rl.is_key_pressed(KEY_D):
+                        self.menu_right(rl, logic)
+                    elif rl.is_key_pressed(KEY_LEFT) or rl.is_key_pressed(KEY_A):
+                        self.menu_left(rl, logic)
+                    elif rl.is_key_pressed(KEY_ENTER) or rl.is_key_pressed(KEY_SPACE):
+                        self.menu_select(rl, logic)
+
+                if rl.is_key_pressed(KEY_P):
+                    logic.toggle_pause()
+                    self.sound_manager.play_sound(rl, SFX.MENU_SELECT, logic.get_sfx_volume())
+                elif rl.is_key_pressed(KEY_GRAVE):
+                    self.debug_mode = not self.debug_mode
+            else:
+                if rl.is_key_pressed(KEY_ENTER):
+                    self.menu_select(rl, logic)
+                elif rl.is_key_pressed(KEY_BACKSPACE):
                     if self.player1_menu_selection == "1" and self.walrus1_name_str.byte_length() > 0:
                         var trimmed = String(self.walrus1_name_str[byte=0 : self.walrus1_name_str.byte_length() - 1])
                         self.walrus1_name_str = trimmed
@@ -1131,3 +1228,5 @@ struct CameraView(Copyable, Movable):
                             self.walrus1_name_str += ch
                         elif self.player1_menu_selection != "1" and self.walrus2_name_str.byte_length() < MAX_INPUT_SIZE:
                             self.walrus2_name_str += ch
+
+        self.net.send_host_snapshot(logic, d_sec)

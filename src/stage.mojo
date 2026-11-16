@@ -161,3 +161,17 @@ struct Stage(Copyable, Movable):
         elif stage == 2:
             return self.right_stage_2[k]
         return 0.0
+
+    def set_tile_dura(mut self, x: Int, y: Int, stage: Int, val: Float32):
+        var k = idx(x, y)
+        if stage == -2:
+            self.left_stage_2[k] = val
+        elif stage == -1:
+            self.left_stage_1[k] = val
+        elif stage == 0:
+            self.center_stage[k] = val
+        elif stage == 1:
+            self.right_stage_1[k] = val
+        elif stage == 2:
+            self.right_stage_2[k] = val
+

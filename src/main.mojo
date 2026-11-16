@@ -6,7 +6,7 @@ from gamelogic import GameLogic
 from cameraview import CameraView
 
 
-struct WalrusApp:
+struct WalrusApp(Movable):
     var rl: Raylib
     var logic: GameLogic
     var view: CameraView
@@ -30,9 +30,10 @@ struct WalrusApp:
             d_sec = 0.05
 
         self.view.process_input(self.rl, self.logic, d_sec)
-        self.logic.update(d_sec)
+        var is_net_guest = self.view.net.match_started and self.view.net.local_player_num == 2
+        if not is_net_guest:
+            self.logic.update(d_sec)
         self.view.draw(self.rl, self.logic)
-
 
 @export
 def init_game() abi("C") -> Pointer[WalrusApp, MutAnyOrigin]:

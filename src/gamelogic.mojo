@@ -425,6 +425,7 @@ struct GameLogic(Copyable, Movable):
             self.state = GameStateEnum.PAUSE_MENU
 
     def reset_game(mut self):
+        self.stage.generate_map(self.rng)
         self.state = GameStateEnum.PLAYING
         self.walrus1.spawn(Vec2f(5.0 * WINDOW_WIDTH / 8.0, WINDOW_HEIGHT / 2.0))
         self.walrus2.spawn(Vec2f(3.0 * WINDOW_WIDTH / 8.0, WINDOW_HEIGHT / 2.0))
